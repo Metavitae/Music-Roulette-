@@ -1,1 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"/>
+  <meta name="theme-color" content="#0e0700"/>
+  <meta name="description" content="Spin the wheel and discover your next music genre"/>
 
+  <!-- PWA Meta -->
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Music Roulette"/>
+  <meta name="application-name" content="Music Roulette"/>
+
+  <!-- Inline manifest via data URI -->
+  <link rel="manifest" href="data:application/manifest+json,{
+    &quot;name&quot;:&quot;Music Roulette&quot;,
+    &quot;short_name&quot;:&quot;Roulette&quot;,
+    &quot;description&quot;:&quot;Spin the wheel and discover your next music genre&quot;,
+    &quot;start_url&quot;:&quot;.&quot;,
+    &quot;display&quot;:&quot;standalone&quot;,
+    &quot;orientation&quot;:&quot;portrait&quot;,
+    &quot;background_color&quot;:&quot;#0e0700&quot;,
+    &quot;theme_color&quot;:&quot;#0e0700&quot;,
+    &quot;icons&quot;:[
+      {&quot;src&quot;:&quot;https://api.iconify.design/twemoji:slot-machine.svg?width=192&height=192&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;},
+      {&quot;src&quot;:&quot;https://api.iconify.design/twemoji:slot-machine.svg?width=512&height=512&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}
+    ]
+  }"/>
+
+  <!-- Apple touch icon (inline SVG as data URI) -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230e0700'/%3E%3Ccircle cx='50' cy='50' r='38' fill='none' stroke='%23c9952a' stroke-width='3'/%3E%3Ctext x='50' y='62' font-size='44' text-anchor='middle'%3E🎰%3C/text%3E%3C/svg%3E"/>
+
+  <title>Music Roulette</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --bg:#0e0700; --surface:#1c1005;
+      --gold:#c9952a; --gold2:#f0c040;
+      --red:#6b1212; --cream:#f2e8d0; --muted:#7a6040;
+      --safe-top:env(safe-area-inset-top,0px);
+      --safe-bot:env(safe-area-inset-bottom,0px);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    html,body{height:100%;}
+    body{
+      background:var(--bg);color:var(--cream);
+      font-family:'IM Fell English',serif;
+      height:100dvh;display:flex;flex-direction:column;
+      align-items:center;overflow:hidden;
+    }
+    body::before{
+      content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background:
+        repeating-linear-gradient(92deg,transparent 0,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px),
+        radial-gradient(ellipse at 50% 35%,rgba(201,149,42,.07) 0%,transparent 65%);
+    }
+
+    /* splash screen */
+    #splash{
+      position:fixed;inset:0;z-index:999;
+      background:var(--bg);
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:16px;
+      transition:opacity .6s ease;
+    }
+    #splash.hide{opacity:0;pointer-events:none;}
+    .splash-icon{font-size:72px;animation:pulse 1.2s ease-in-out infinite;}
+    .splash-title{
+      font-family:'Rye',cursive;font-size:28px;
+      color:var(--gold2);letter-spacing:4px;
+      text-shadow:2px 2px 0 #3a1a00,0 0 20px rgba(240,192,64,.4);
+    }
+    .splash-sub{font-family:'Rye',cursive;font-size:10px;color:var(--gold);letter-spacing:3px;}
+    .splash-bar{
+      width:160px;height:3px;background:#1c1005;border-radius:2px;
+      border:1px solid rgba(201,149,42,.3);overflow:hidden;margin-top:8px;
+    }
+    .splash-fill{height:100%;background:var(--gold2);width:0;transition:width 1.8s ease;}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+
+    .screen{display:none;flex-direction:column;align-items:center;width:100%;height:100dvh;overflow:hidden;}
+    .screen.active{display:flex;}
+
+    #wheelScreen{
+      justify-content:space-between;
+      padding:calc(var(--safe-top) + 8px) 20px calc(var(--safe-bot) + 12px);
+    }
+    header{text-align:center;z-index:1;flex-shrink:0;}
+    .logo{
+      font-family:'Rye',cursive;font-size:clamp(20px,5.5vw,30px);
+      color:var(--gold2);letter-spacing:3px;line-height:1;
+      text-shadow:2px 2px 0 #3a1a00,0 0 18px rgba(240,192,64,.3);
+    }
+    .logo-rule{display:flex;align-items:center;gap:8px;margin:3px 0 1px;}
+    .logo-rule hr{flex:1;border:none;border-top:1px solid var(--gold);opacity:.4;}
+    .logo-rule span{font-family:'Rye',cursive;font-size:clamp(7px,2vw,9px);color:var(--gold);letter-spacing:3px;}
+
+    .wheel-wrap{
+      position:relative;z-index:1;flex-shrink:0;
+      width:min(66vw,56vh,280px);height:min(66vw,56vh,280px);
+    }
+    canvas{
+      width:100%;height:100%;border-radius:50%;display:block;
+      filter:drop-shadow(0 0 18px rgba(201,149,42,.4)) drop-shadow(0 2px 8px rgba(0,0,0,.8));
+      transition:filter .3s;
+    }
+    canvas.glow{filter:drop-shadow(0 0 30px rgba(240,192,64,.65)) drop-shadow(0 2px 8px rgba(0,0,0,.8));}
+    .pointer{
+      position:absolute;top:50%;right:-19px;transform:translateY(-50%);
+      border-top:13px solid transparent;border-bottom:13px solid transparent;
+      border-right:25px solid var(--gold2);
+      filter:drop-shadow(0 0 5px var(--gold));
+    }
+    .hub{
+      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:clamp(28px,8vw,40px);height:clamp(28px,8vw,40px);
+      background:var(--bg);border-radius:50%;border:2.5px solid var(--gold);
+      display:flex;align-items:center;justify-content:center;
+      color:var(--gold2);font-size:clamp(12px,3.5vw,16px);z-index:10;
+    }
+    .wheel-border {position:absolute;inset:-5px; border-radius:50%;border:1.5px solid var(--gold);opacity:.35;pointer-events:none;}
+    .wheel-border2{position:absolute;inset:-10px;border-radius:50%;border:1px   solid var(--gold);opacity:.12;pointer-events:none;}
+    .ring{
+      position:absolute;top:-9px;left:-9px;
+      width:calc(100% + 18px);height:calc(100% + 18px);
+      transform:rotate(-90deg);pointer-events:none;opacity:0;transition:opacity .3s;
+    }
+    .ring.on{opacity:1;}
+    .ring circle{fill:none;stroke:var(--gold2);stroke-width:3;stroke-linecap:round;}
+
+    .result-box{
+      background:var(--surface);border-radius:4px;
+      padding:8px 22px;width:100%;max-width:320px;
+      border:1px solid var(--gold);outline:2px solid rgba(201,149,42,.18);
+      outline-offset:3px;z-index:1;text-align:center;flex-shrink:0;position:relative;
+    }
+    .result-box::before,.result-box::after{
+      content:'✦';position:absolute;top:50%;transform:translateY(-50%);
+      color:var(--gold);font-size:11px;opacity:.55;
+    }
+    .result-box::before{left:7px;}.result-box::after{right:7px;}
+    .rlabel{font-family:'Rye',cursive;font-size:7px;letter-spacing:3px;color:var(--muted);margin-bottom:2px;}
+    .rgenre{
+      font-family:'Rye',cursive;font-size:clamp(16px,5vw,24px);
+      letter-spacing:2px;color:var(--gold2);line-height:1.1;
+      text-shadow:1px 1px 0 #3a1a00;transition:all .3s;
+    }
+    .rgenre.dim{color:var(--muted);font-size:clamp(12px,3.5vw,15px);}
+    .rvibe{font-style:italic;font-size:clamp(8px,2.2vw,10px);color:var(--muted);margin-top:2px;}
+
+    .btns{width:100%;max-width:320px;display:flex;flex-direction:column;gap:9px;z-index:1;flex-shrink:0;}
+    .saloon-btn{
+      width:100%;padding:13px;border-radius:3px;
+      font-family:'Rye',cursive;font-size:clamp(13px,3.8vw,16px);
+      letter-spacing:2px;cursor:pointer;text-align:center;
+      background:var(--red);color:var(--gold2);
+      border:1.5px solid var(--gold);outline:2px solid rgba(201,149,42,.18);outline-offset:2px;
+      text-shadow:1px 1px 2px #000;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 10px rgba(0,0,0,.6);
+      transition:background .2s,transform .12s;touch-action:manipulation;
+      -webkit-user-select:none;user-select:none;
+    }
+    .saloon-btn:active{transform:scale(0.97);}
+    .saloon-btn:disabled{background:#2a1a08;color:var(--muted);border-color:var(--muted);cursor:default;transform:none;}
+    #ytBtn{background:#1a0a00;display:none;}
+    #ytBtn.show{display:block;animation:up .35s ease;}
+    @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+    .hint{font-style:italic;font-size:8px;color:var(--muted);z-index:1;flex-shrink:0;}
+    .hint span{color:var(--gold);}
+
+    /* install banner */
+    #installBanner{
+      display:none;position:fixed;bottom:0;left:0;right:0;
+      background:var(--surface);border-top:1px solid var(--gold);
+      padding:12px 16px calc(var(--safe-bot) + 12px);
+      z-index:100;flex-direction:column;gap:8px;
+      animation:slideUp .4s ease;
+    }
+    #installBanner.show{display:flex;}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    .banner-text{font-family:'Rye',cursive;font-size:11px;color:var(--gold2);letter-spacing:1px;text-align:center;}
+    .banner-sub{font-style:italic;font-size:9px;color:var(--muted);text-align:center;}
+    .banner-btns{display:flex;gap:8px;}
+    .banner-btns button{flex:1;padding:10px;border-radius:3px;font-family:'Rye',cursive;font-size:12px;
+      letter-spacing:1px;cursor:pointer;touch-action:manipulation;}
+    #installBtn{background:var(--red);color:var(--gold2);border:1px solid var(--gold);}
+    #dismissBtn{background:transparent;color:var(--muted);border:1px solid var(--muted);}
+
+    /* player */
+    #playerScreen{justify-content:flex-start;padding-top:calc(var(--safe-top) + 8px);background:#000;}
+    .player-top{
+      width:100%;display:flex;align-items:center;gap:10px;
+      padding:0 14px 8px;flex-shrink:0;background:var(--bg);
+      border-bottom:1px solid rgba(201,149,42,.25);
+    }
+    .back-btn{
+      font-family:'Rye',cursive;font-size:12px;letter-spacing:1px;
+      background:var(--surface);color:var(--gold);border:1px solid var(--gold);
+      border-radius:3px;padding:7px 12px;cursor:pointer;flex-shrink:0;touch-action:manipulation;
+    }
+    .back-btn:active{opacity:.7;}
+    .player-meta{flex:1;min-width:0;}
+    .player-genre{
+      font-family:'Rye',cursive;font-size:clamp(15px,4.5vw,20px);
+      color:var(--gold2);letter-spacing:2px;line-height:1;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .player-vibe{font-style:italic;font-size:10px;color:var(--muted);margin-top:2px;}
+    .yt-wrap{flex:1;width:100%;background:#000;position:relative;overflow:hidden;}
+    .yt-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:none;}
+    .player-foot{
+      width:100%;padding:10px 14px calc(var(--safe-bot) + 10px);
+      background:var(--bg);flex-shrink:0;border-top:1px solid rgba(201,149,42,.25);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Splash Screen -->
+<div id="splash">
+  <div class="splash-icon">🎰</div>
+  <div class="splash-title">Music Roulette</div>
+  <div class="splash-sub">Spin &middot; Discover &middot; Play</div>
+  <div class="splash-bar"><div class="splash-fill" id="splashFill"></div></div>
+</div>
+
+<!-- Wheel Screen -->
+<div class="screen active" id="wheelScreen">
+  <header>
+    <div class="logo">Music Roulette</div>
+    <div class="logo-rule"><hr/><span>Spin &middot; Discover &middot; Play</span><hr/></div>
+  </header>
+
+  <div class="wheel-wrap">
+    <svg class="ring" id="ring" viewBox="0 0 308 308">
+      <circle id="arc" cx="154" cy="154" r="150"/>
+    </svg>
+    <canvas id="c" width="280" height="280"></canvas>
+    <div class="wheel-border"></div><div class="wheel-border2"></div>
+    <div class="pointer"></div>
+    <div class="hub">✦</div>
+  </div>
+
+  <div class="result-box">
+    <div class="rlabel">~ Selected Genre ~</div>
+    <div class="rgenre dim" id="rg">Spin to Begin</div>
+    <div class="rvibe" id="rv">What shall the wheel choose for thee?</div>
+  </div>
+
+  <div class="btns">
+    <button class="saloon-btn" id="spinBtn">Spin the Wheel</button>
+    <button class="saloon-btn" id="ytBtn">&#9834; Play on YouTube &#9834;</button>
+  </div>
+
+  <div class="hint" id="hintText">Add to <span>Home Screen</span> for the finest experience</div>
+</div>
+
+<!-- Player Screen -->
+<div class="screen" id="playerScreen">
+  <div class="player-top">
+    <button class="back-btn" id="backBtn">&#8592; Back</button>
+    <div class="player-meta">
+      <div class="player-genre" id="playerGenre">JAZZ</div>
+      <div class="player-vibe" id="playerVibe">Cool, smooth &amp; timeless</div>
+    </div>
+  </div>
+  <div class="yt-wrap">
+    <iframe id="ytFrame" allow="autoplay; encrypted-media; fullscreen"
+      allowfullscreen referrerpolicy="no-referrer-when-downgrade" src=""></iframe>
+  </div>
+  <div class="player-foot">
+    <button class="saloon-btn" id="reSpinBtn">&#8635; Spin Again</button>
+  </div>
+</div>
+
+<!-- Install Banner -->
+<div id="installBanner">
+  <div class="banner-text">&#9834; Install Music Roulette &#9834;</div>
+  <div class="banner-sub">Add to your home screen for the full experience</div>
+  <div class="banner-btns">
+    <button id="installBtn">Install</button>
+    <button id="dismissBtn">Not Now</button>
+  </div>
+</div>
+
+<script>
+// ── SERVICE WORKER (inline via blob) ──────────────────────────────
+const swCode = `
+const CACHE = 'music-roulette-v1';
+const ASSETS = ['/'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+});
+`;
+if ('serviceWorker' in navigator) {
+  const blob = new Blob([swCode], {type:'text/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, {scope: '/'}).catch(()=>{});
+}
+
+// ── SPLASH ────────────────────────────────────────────────────────
+const splash = document.getElementById('splash');
+const splashFill = document.getElementById('splashFill');
+splashFill.style.width = '100%';
+setTimeout(() => {
+  splash.classList.add('hide');
+  setTimeout(() => splash.remove(), 700);
+}, 2000);
+
+// ── PWA INSTALL PROMPT ────────────────────────────────────────────
+let deferredPrompt = null;
+const installBanner = document.getElementById('installBanner');
+const installBtn    = document.getElementById('installBtn');
+const dismissBtn    = document.getElementById('dismissBtn');
+const hintText      = document.getElementById('hintText');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBanner.classList.add('show');
+  hintText.style.display = 'none';
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBanner.classList.remove('show');
+  if (outcome === 'accepted') hintText.textContent = '✦ Installed successfully ✦';
+});
+
+dismissBtn.addEventListener('click', () => {
+  installBanner.classList.remove('show');
+});
+
+window.addEventListener('appinstalled', () => {
+  installBanner.classList.remove('show');
+  hintText.style.display = 'block';
+  hintText.textContent = '✦ App installed successfully ✦';
+});
+
+// ── WHEEL ─────────────────────────────────────────────────────────
+const G = [
+  { name:"HIP HOP",    c1:"#5c1a1a", c2:"#7a2020", vibe:"Drop the beat & feel the rhythm",   yt:"PLH6oMEPMFJsEon0EBH4HqGsZ6wPKxNEJo" },
+  { name:"JAZZ",       c1:"#1a3a1a", c2:"#1e4a1e", vibe:"Cool, smooth & timeless",           yt:"PLbFnXbzGJyAuFAv5XKRdBJHFiJuNENS2p" },
+  { name:"ROCK",       c1:"#2a1a00", c2:"#3a2500", vibe:"Turn it up to eleven",              yt:"PLgzTt0k8mXzEk586ze4BjKoZSxe68GnFz" },
+  { name:"ELECTRONIC", c1:"#001a2a", c2:"#00243a", vibe:"Lost in the bassline",              yt:"PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI" },
+  { name:"POP",        c1:"#3a0a2a", c2:"#4a1038", vibe:"Catchy hooks incoming",             yt:"PLDIoUOhQQPlXr63I_vwF06Dq6cFnIa9FE" },
+  { name:"R&B",        c1:"#1a0a3a", c2:"#25104a", vibe:"Smooth & soulful vibes",            yt:"PLH6oMEPMFJsHL8A_S2GkGAkN0h15l3kI8" },
+  { name:"CLASSICAL",  c1:"#0a1a2a", c2:"#102030", vibe:"Elegant & timeless",                yt:"PLqOZ3pGhqPlkUXnOqVVvBxpFCfx3WeFNh" },
+  { name:"REGGAE",     c1:"#003a10", c2:"#004a18", vibe:"One love, one rhythm",              yt:"PLuKg-wMFGLHI0LD8yT7OdPkAOPMmUC-rS" },
+  { name:"METAL",      c1:"#1a1a1a", c2:"#252525", vibe:"Headbang time",                     yt:"PL7Da3RI4KypqDHJMCN97hJAGBWOH4DVYJ" },
+  { name:"LATIN",      c1:"#3a1a00", c2:"#4a2200", vibe:"Move those feet",                   yt:"PLM-mQfJTLzYBRMGNvhBK67X9v0VHk2OFE" },
+  { name:"COUNTRY",    c1:"#2a2000", c2:"#3a2c00", vibe:"Take me home, country roads",       yt:"PLcfQmtiA7yOuH_-1bpReHVKFoGhIkJPtG" },
+  { name:"BLUES",      c1:"#00101a", c2:"#001828", vibe:"Feel every note in your soul",      yt:"PLGBuKfnErZlBryWQVpnDiknAoHAz4xLHd" },
+];
+
+const cv=document.getElementById('c'), ct=cv.getContext('2d');
+const spinBtn=document.getElementById('spinBtn'), ytBtn=document.getElementById('ytBtn');
+const rg=document.getElementById('rg'), rv=document.getElementById('rv');
+const ring=document.getElementById('ring'), arc=document.getElementById('arc');
+const wheelScreen=document.getElementById('wheelScreen');
+const playerScreen=document.getElementById('playerScreen');
+const ytFrame=document.getElementById('ytFrame');
+const playerGenre=document.getElementById('playerGenre');
+const playerVibe=document.getElementById('playerVibe');
+const backBtn=document.getElementById('backBtn');
+const reSpinBtn=document.getElementById('reSpinBtn');
+
+const N=G.length, SL=2*Math.PI/N;
+const RAD=150, CIRC=2*Math.PI*RAD;
+arc.style.strokeDasharray=CIRC; arc.style.strokeDashoffset=CIRC;
+
+let angle=0,spd=0,raf=null,picked=null,state='idle',t0=null;
+const DUR=5000,VMAX=0.22,FRIC=0.985;
+
+document.fonts.load("bold 16px 'Rye'").then(()=>{ draw(0); });
+
+function draw(a){
+  const S=cv.width, hx=S/2, hy=S/2, r=hx-4;
+  ct.clearRect(0,0,S,S);
+
+  // PASS 1 — slices
+  for(let i=0;i<N;i++){
+    const sa=a+i*SL, ea=sa+SL, g=G[i], m=sa+SL/2;
+    const grd=ct.createRadialGradient(hx,hy,0,hx,hy,r);
+    grd.addColorStop(0,g.c2); grd.addColorStop(1,g.c1);
+    ct.beginPath(); ct.moveTo(hx,hy); ct.arc(hx,hy,r,sa,ea); ct.closePath();
+    ct.fillStyle=grd; ct.fill();
+    ct.strokeStyle='rgba(201,149,42,0.45)'; ct.lineWidth=1.5; ct.stroke();
+    // shine
+    ct.save();
+    ct.beginPath(); ct.moveTo(hx,hy); ct.arc(hx,hy,r,sa,ea); ct.closePath(); ct.clip();
+    const sh=ct.createRadialGradient(hx+Math.cos(m)*r*.3,hy+Math.sin(m)*r*.3,0,hx+Math.cos(m)*r*.3,hy+Math.sin(m)*r*.3,r*.6);
+    sh.addColorStop(0,'rgba(255,255,255,.07)'); sh.addColorStop(1,'rgba(0,0,0,0)');
+    ct.fillStyle=sh; ct.fillRect(0,0,S,S); ct.restore();
+    // rim dot
+    ct.save(); ct.translate(hx+Math.cos(m)*r*.84,hy+Math.sin(m)*r*.84);
+    ct.beginPath(); ct.arc(0,0,2.2,0,Math.PI*2);
+    ct.fillStyle='rgba(240,192,64,.5)'; ct.fill(); ct.restore();
+  }
+
+  // outer ring
+  ct.beginPath(); ct.arc(hx,hy,r,0,Math.PI*2);
+  ct.strokeStyle='rgba(201,149,42,.55)'; ct.lineWidth=2; ct.stroke();
+
+  // PASS 2 — labels on top
+  ct.font=`bold ${S*.036}px 'Rye', serif`;
+  ct.textAlign='center'; ct.textBaseline='middle';
+  for(let i=0;i<N;i++){
+    const m=a+i*SL+SL/2, lr=r*.52;
+    ct.save();
+    ct.translate(hx+Math.cos(m)*lr, hy+Math.sin(m)*lr);
+    ct.rotate(m);
+    ct.fillStyle='rgba(0,0,0,0.9)'; ct.fillText(G[i].name,1.5,1.5);
+    ct.fillStyle='#f0c040';         ct.fillText(G[i].name,0,0);
+    ct.restore();
+  }
+
+  // hub last
+  const hr=S*.075;
+  const hgrd=ct.createRadialGradient(hx,hy,0,hx,hy,hr);
+  hgrd.addColorStop(0,'#3a1a00'); hgrd.addColorStop(1,'#0e0700');
+  ct.beginPath(); ct.arc(hx,hy,hr,0,Math.PI*2);
+  ct.fillStyle=hgrd; ct.fill();
+  ct.strokeStyle='#c9952a'; ct.lineWidth=2.5; ct.stroke();
+  ct.beginPath(); ct.arc(hx,hy,hr*.62,0,Math.PI*2);
+  ct.strokeStyle='rgba(201,149,42,.28)'; ct.lineWidth=1; ct.stroke();
+}
+
+function pick(a){
+  const n=((0-a)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+  return G[Math.floor(n/SL)%N];
+}
+
+function tick(ts){
+  if(!t0) t0=ts;
+  const el=ts-t0;
+  if(state==='spinning'){
+    if(spd<VMAX) spd+=(VMAX-spd)*.06;
+    arc.style.strokeDashoffset=CIRC*(1-Math.min(el/DUR,1));
+    if(el>=DUR){ state='coast'; ring.classList.remove('on'); cv.classList.remove('glow'); }
+  }
+  if(state==='coast'){
+    spd*=FRIC;
+    if(spd<.001){ spd=0; state='done'; land(); return; }
+  }
+  angle+=spd; draw(angle); raf=requestAnimationFrame(tick);
+}
+
+function land(){
+  picked=pick(angle);
+  rg.classList.remove('dim'); rg.textContent=picked.name; rv.textContent=picked.vibe;
+  spinBtn.disabled=false; spinBtn.textContent='Spin Again';
+  ytBtn.textContent='\u266a Play '+picked.name+' \u266a';
+  ytBtn.classList.add('show');
+}
+
+function openPlayer(){
+  if(!picked) return;
+  playerGenre.textContent=picked.name;
+  playerVibe.textContent=picked.vibe;
+  window.location.href='https://www.youtube.com/playlist?list='+picked.yt;
+}
+
+function closePlayer(){
+  ytFrame.src='';
+  playerScreen.classList.remove('active');
+  wheelScreen.classList.add('active');
+}
+
+function spin(){
+  if(state==='spinning'||state==='coast') return;
+  if(raf) cancelAnimationFrame(raf);
+  state='spinning'; t0=null; spd=0; picked=null;
+  spinBtn.disabled=true; spinBtn.textContent='Spinning...';
+  ytBtn.classList.remove('show');
+  rg.classList.add('dim'); rg.textContent='The Wheel Turns...';
+  rv.textContent='What shall the wheel choose for thee?';
+  arc.style.strokeDashoffset=CIRC;
+  ring.classList.add('on'); cv.classList.add('glow');
+  raf=requestAnimationFrame(tick);
+}
+
+spinBtn.addEventListener('click', spin);
+ytBtn.addEventListener('click', openPlayer);
+backBtn.addEventListener('click', closePlayer);
+reSpinBtn.addEventListener('click',()=>{ closePlayer(); spin(); });
+</script>
+</body>
+</html>
